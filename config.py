@@ -81,8 +81,8 @@ class Config():
     # Model type
     use_bilstm = True
     hidden_size_lstm = 100
-   # hidden_size_lstm_list = [100, 50, 150, 200, 300]
-    hidden_size_lstm_list = [100]
+    hidden_size_lstm_list = [100, 50, 150, 200, 300]
+    # hidden_size_lstm_list = [100]
 
 
     use_crf = True
@@ -94,7 +94,7 @@ class Config():
 
     # Training Config variables
     default_lr = 0.001
-    learning_rates_list = [0.01]
+    learning_rates_list = [0.01, 0.001]
     learning_method = "adam"
     clip = 5
     nepochs = 50

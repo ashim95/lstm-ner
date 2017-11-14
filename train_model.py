@@ -36,11 +36,11 @@ def main():
     model = NerModelLstm(config)
     model.build_model()
 
-    model.train(train_vectorize, dev_vectorize)
+    model.train(train_vectorize, dev_vectorize, test_vectorize)
 
-    print "Evaluating the best model on Test Set"
+    # print "Evaluating the best model on Test Set"
 
-    model.evaluate(test_vectorize)
+    # model.evaluate(test_vectorize)
     
 
 if __name__ == "__main__":

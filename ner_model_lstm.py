@@ -299,7 +299,7 @@ class NerModelLstm():
         self.add_loss_op()
         self.add_training_op()
 
-    def train(self, train_set, dev_set):
+    def train(self, train_set, dev_set, test_set):
 
         for h_size_lstm in self.config.hidden_size_lstm_list:
 
@@ -307,6 +307,8 @@ class NerModelLstm():
 
 
             for lr in self.config.learning_rates_list:
+
+                print "Using Learning rate " + str(lr) + "\n"
 
                 tf.reset_default_graph()
 
@@ -339,7 +341,7 @@ class NerModelLstm():
                     # early stopping and saving best parameters
                     if score >= best_score:
                         nepoch_no_imprv = 0
-                        self.sess.save_session()
+                        self.save_session()
                         best_score = score
                         self.logger.info("- new best score!")
                     else:
@@ -348,6 +350,11 @@ class NerModelLstm():
                             self.logger.info("- early stopping {} epochs without "\
                                     "improvement".format(nepoch_no_imprv))
                             break
+
+
+                print "Evaluating the best model on Test Set"
+
+                self.evaluate(test_set)
 
 
     def run_epoch(self, train_set, dev_set, epoch):
