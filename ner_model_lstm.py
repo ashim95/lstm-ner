@@ -2,7 +2,9 @@ import numpy as np
 import os
 import tensorflow as tf
 from basic_utils import Progbar
-from utils import get_next_batch, pad_sequences, get_chunks
+from utils import get_next_batch, pad_sequences, get_chunks, pad_sequences_word_ids
+from utils import pad_sequences_char_ids, pad_sequences_features
+import pprint
 
 class NerModelLstm():
     """Class of Model for NER"""
@@ -54,6 +56,11 @@ class NerModelLstm():
         # Although known, still using None for convenience
         self.embd_place = tf.placeholder(tf.float32, shape=[None, None], 
                         name="embd_place")
+
+        # Placeholder for input features not computed in graph (hand crafted)
+        # shape = (batch_size, max length of sentence in batch, number_of__handcrafted_features)
+        self.input_feats = tf.placeholder(tf.float32, shape=[None, None, self.config.features_size], 
+                            name="input_feats")
 
 
 
@@ -112,8 +119,11 @@ class NerModelLstm():
                         shape=[s[0], s[1], 2*self.config.hidden_size_char])
                 word_embeddings = tf.concat([word_embeddings, output], axis=-1)
 
-        # with tf.variable_scope("other_features"):
-
+        with tf.variable_scope("other_features"):
+            # print word_embeddings.shape
+            if self.config.use_hand_crafted:
+                word_embeddings = tf.concat([word_embeddings, self.input_feats], axis=-1)
+            # print word_embeddings.shape
         # Add for discrete feature sets
 
         # if self.config.use_dropout:
@@ -247,23 +257,38 @@ class NerModelLstm():
 
     def create_feed_dict(self, sentences, labels=None):
 
-        if self.config.use_chars:
+        # if self.config.use_chars:
             
-            word_ids, sequence_lengths, char_ids, word_lengths = pad_sequences(sentences, 
-                                                                    self.config.word_index_padding, 
-                                                                    self.config.char_index_padding, 
-                                                                    has_char = True)
+        #     word_ids, sequence_lengths, char_ids, word_lengths = pad_sequences(sentences, 
+        #                                                             self.config.word_index_padding, 
+        #                                                             self.config.char_index_padding, 
+        #                                                             has_char = True)
 
-        else:
-            word_ids, sequence_lengths, _, _ = pad_sequences(sentences, 
-                                                                    self.config.word_index_padding, 
-                                                                    self.config.char_index_padding, 
-                                                                    )
+        # else:
+        #     word_ids, sequence_lengths, _, _ = pad_sequences(sentences, 
+        #                                                             self.config.word_index_padding, 
+        #                                                             self.config.char_index_padding, 
+        #                                                             )
         # print len(word_ids)
 
         # print word_ids[:2]
         # print sequence_lengths[:2]
         # Create feed dictionary
+        word_ids, sequence_lengths = pad_sequences_word_ids(sentences, self.config.word_index_padding, self.config)
+
+        if self.config.use_chars:
+
+            char_ids, word_lengths = pad_sequences_char_ids(sentences, self.config.char_index_padding, self.config)
+
+        if self.config.use_hand_crafted:
+            input_feats = pad_sequences_features(sentences, self.config.features_padding, self.config)
+            # print input_feats[0][0]
+            # print type(input_feats[0][0])
+            # l = [len(i) for i in input_feats]
+            # #print l
+            # pprint.pprint(input_feats[:10])
+
+        # print word_ids
         feed = {
             self.word_ids: word_ids,
             self.sequence_lengths: sequence_lengths
@@ -281,6 +306,11 @@ class NerModelLstm():
         if self.config.use_chars:
             feed[self.char_ids] = char_ids
             feed[self.word_lengths] = word_lengths
+
+        if self.config.use_hand_crafted:
+            arr = np.asarray(input_feats )
+            # print arr.shape
+            feed[self.input_feats] = arr
 
         return feed
 
@@ -373,6 +403,7 @@ class NerModelLstm():
         for i, (sentences_batch, labels_batch) in enumerate(get_next_batch(  (x_train, y_train), self.batch_size)):
 
             feed_batch = self.create_feed_dict(sentences_batch, labels_batch)
+            # print feed_batch
 
             _, train_loss = self.sess.run([self.train_op, self.loss], feed_dict=feed_batch)
 
@@ -451,5 +482,6 @@ class NerModelLstm():
         print "Total Correct: " + str(total_correct)
         print "Precision: " + str(p)
         print "Recall: " + str(r)
+	print "F1: " + str(f1)
         
         return {"acc": 100*acc, "f1": 100*f1, "Precision": 100*p, "Recall": 100*r}

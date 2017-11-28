@@ -1,4 +1,4 @@
-from utils import load_dataset, vectorize_text_data, get_next_batch
+from utils import load_dataset, vectorize_text_data, get_next_batch, generate_words_vocab
 from ner_model_lstm import NerModelLstm
 from config import Config
 
@@ -13,7 +13,11 @@ def main():
 
     test_data = load_dataset(config.filename_test)
 
+    # Reduce Size of embeddings matrix
+    generate_words_vocab(train_data, dev_data, test_data, config)
+
     # Vectorize Text data and convert to indices
+    print len(config.vocab_words)
     train_vectorize = vectorize_text_data(train_data, config.vocab_words, 
         config.vocab_chars, config.vocab_tags, config)
 

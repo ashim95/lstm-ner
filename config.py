@@ -19,12 +19,25 @@ class Config():
 
             self.load_embeddings()
 
+            self.load_dictionary()
+
+    
+    def load_dictionary(self):
+        names = []
+        with open(self.dictionary_names_file, 'rb') as fp:
+            for line in fp:
+                names.append(line.strip().lower())
+        self.gazetteer  = set(names)
+
     def load_vocab(self):
         
         # For loading vocabulary dictionaries
         self.vocab_words, self.vocab_chars, self.vocab_tags = import_vocab_dicts(self)
-        
+        self.update_size()
+        self.vocabulary = set()
         # size of respective dictionaries
+
+    def update_size(self):    
         self.nwords     = len(self.vocab_words)
         self.nchars     = len(self.vocab_chars)
         self.ntags      = len(self.vocab_tags)
@@ -39,6 +52,8 @@ class Config():
     UNK = "$UNK$"
     NUM = "$NUM$"
     NONE = "$NONE$"
+
+    special_tokens = [UNK, NUM, NONE]
 
     dir_output = "results/test/"
     dir_model  = dir_output + "model.weights/"
@@ -57,6 +72,7 @@ class Config():
     word2vec_size = 5443659
     word2vec_dim = 200
     use_pretrained = False
+    reduce_embeddings = True
 
 
 
@@ -69,23 +85,23 @@ class Config():
 
 
     # Char Embedding variables
-    use_chars = True
+    use_chars = False
     dim_char = 100
     hidden_size_char = 100
 
     # Dropout
     use_dropout = True
-    dropout_rate = 0.2
+    dropout_rate = 0.5
 
 
     # Model type
     use_bilstm = True
     hidden_size_lstm = 100
-    hidden_size_lstm_list = [100, 50, 150, 200, 300]
-    # hidden_size_lstm_list = [100]
+    # hidden_size_lstm_list = [100, 50, 150, 200, 300]
+    hidden_size_lstm_list = [300]
 
 
-    use_crf = True
+    use_crf = False
 
     # Class Weights for highly imbalanced datasets
     use_class_weights = False
@@ -94,11 +110,11 @@ class Config():
 
     # Training Config variables
     default_lr = 0.001
-    learning_rates_list = [0.01, 0.001]
+    learning_rates_list = [0.001]
     learning_method = "adam"
-    clip = 5
-    nepochs = 50
-    batch_size = 128
+    clip = -1
+    nepochs = 70
+    batch_size = 256
     lr_decay = 1
     nepoch_no_imprv = 10
 
@@ -112,3 +128,67 @@ class Config():
     word_index_padding = word2vec_size - 1
     padding_label = 0
     char_index_padding = n_chars -1 
+
+    # For Hand Crafted and Dictionary
+    use_hand_crafted = False
+    features_size = 2
+    features_padding = 0.0
+    use_dictionary = True
+    dictionary_names_file = "data/drug_names_wiki.txt"
+    features_index = [0 , 1]
+    features_size = len(features_index)
+
+    # Path Variables For Java Program
+    java_input_path = "logs/input/in.txt"
+    java_output_path = "logs/output/out.txt"
+    java_dictionary_file_1 = "data/drug_names_wiki.txt"
+    java_dictionary_file_2 = "data/drug_names_long.txt" 
+    java_jar_file = "drugner_java/jars/drugner_java_1.0.jar"
+
+
+    print "Printing all parameter values ... "
+
+    print "use_chars\t" + str(use_chars) 
+    print "dim_char\t" + str(dim_char) 
+    print "hidden_size_char\t" + str(hidden_size_char) 
+
+    print "use_dropout\t" + str(use_dropout) 
+    print "dropout_rate\t" + str(dropout_rate) 
+
+
+    print "use_bilstm\t" + str(use_bilstm) 
+    # print "hidden_size_lstm\t" + str(hidden_size_lstm) 
+    print "hidden_size_lstm_list\t" + str(hidden_size_lstm_list) 
+
+
+    print "use_crf\t" + str(use_crf) 
+
+    # print "use_class_weights\t" + str(use_class_weights) 
+    # print "class_0_weight\t" + str(class_0_weight) 
+
+
+    # print "default_lr\t" + str(default_lr) 
+    print "learning_rates_list\t" + str(learning_rates_list) 
+    print "learning_method\t" + str(learning_method) 
+    print "clip\t" + str(clip) 
+    print "nepochs\t" + str(nepochs) 
+    print "batch_size\t" + str(batch_size) 
+    print "lr_decay\t" + str(lr_decay) 
+    print "nepoch_no_imprv\t" + str(nepoch_no_imprv) 
+
+
+
+    # print "n_chars\t" + str(n_chars) 
+    # print "n_tags\t" + str(n_tags) 
+
+
+    # print "word_index_padding\t" + str(word_index_padding) 
+    # print "padding_label\t" + str(padding_label) 
+    # print "char_index_padding\t" + str(char_index_padding) 
+
+    print "use_hand_crafted\t" + str(use_hand_crafted) 
+    print "features_size\t" + str(features_size) 
+    print "features_padding\t" + str(features_padding) 
+    print "use_dictionary\t" + str(use_dictionary) 
+    print "dictionary_names_file\t" + str(dictionary_names_file) 
+    print "features_index\t" + str(features_index) 

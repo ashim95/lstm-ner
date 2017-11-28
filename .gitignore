@@ -1,0 +1,9 @@
+*.pyc
+env_ner/
+results/
+data/
+log*
+drugner_java/bin
+drugner_java/RemoteSystemsTempFiles
+*.classpath
+*.project

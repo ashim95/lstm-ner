@@ -1,6 +1,7 @@
 import numpy as np
 import pickle
 import gensim
+from feature_extractor import extract_features
 
 # Special Tokens
 UNK = "$UNK$"
@@ -77,7 +78,6 @@ def import_vocab_dicts(config):
     tags_dict = load_pkl_file(config.filename_tags_dict)
     return word_dict, chars_dict, tags_dict
 
-
 def vectorize_text_data(data, vocab_words, vocab_chars, vocab_tags, config):
     """ Vectorize text data, also replaces numbers with NUM token 
                             and converts all words to lowercase
@@ -93,37 +93,39 @@ def vectorize_text_data(data, vocab_words, vocab_chars, vocab_tags, config):
             each word is a tuple (list_of_char_ids, word_id)
     """
 
-    dataset_words, dataset_tags = data
+    dataset_words, dataset_tags = convert_to_list_of_sentences(data)
+
+    hand_features = extract_features(dataset_words, config)
+
     vec_words = []
     vec_tags = []
-    for i in range(len(dataset_words)):
-        doc_words = dataset_words[i]
-        doc_tags = dataset_tags[i]
-        for j in range(len(doc_words)):
-            w = []
-            t = []
-            # vec_sent = []
-            sent_words = doc_words[j]
-            sent_tags = doc_tags[j]
-            for k in range(len(sent_words)):
-                if sent_words[k].isdigit():
-                    if config.use_chars:
-                        w.append(  (  word_to_char_id_list(sent_words[k], vocab_chars)  , vocab_words.get(NUM, vocab_words[UNK])
-                                    )     )
-                        t.append(vocab_tags[sent_tags[k]])
-                    else:
-                        w.append(vocab_words.get(NUM, vocab_words[UNK]))
-                        t.append(vocab_tags[sent_tags[k]])
+    for index1 in range(len(dataset_words)):
+        discrete_features = hand_features[index1]
+        sent_words = dataset_words[index1]
+        sent_tags = dataset_tags[index1]
+        w = []
+        t = []
+        for index2 in range(len(sent_words)):
+            if sent_words[index2].isdigit():
+                if config.use_chars:
+                    w.append(  (  word_to_char_id_list(sent_words[index2], vocab_chars)  , vocab_words.get(NUM, vocab_words[UNK]), discrete_features[index2]
+                                )     )
+                    t.append(vocab_tags[sent_tags[index2]])
                 else:
-                    if config.use_chars:
-                        w.append( ( word_to_char_id_list(sent_words[k], vocab_chars) ,
-                         vocab_words.get(sent_words[k].lower(),vocab_words[UNK] ) ) )
-                        t.append(vocab_tags[sent_tags[k]])
-                    else:
-                        w.append(vocab_words.get(sent_words[k].lower(), vocab_words[UNK]))
-                        t.append(vocab_tags[sent_tags[k]])
-            vec_words.append(w)
-            vec_tags.append(t)
+                    w.append((vocab_words.get(NUM, vocab_words[UNK]) , discrete_features[index2]))
+                    t.append(vocab_tags[sent_tags[index2]])
+            else:
+                if config.use_chars:
+                    w.append( ( word_to_char_id_list(sent_words[index2], vocab_chars) ,
+                     vocab_words.get(sent_words[index2].lower(),vocab_words[UNK] ) , discrete_features[index2] ) )
+                    t.append(vocab_tags[sent_tags[index2]])
+                else:
+                    w.append( ( vocab_words.get(sent_words[index2].lower(), vocab_words[UNK]) , discrete_features[index2]))
+                    t.append(vocab_tags[sent_tags[index2]])
+        vec_words.append(w)
+        vec_tags.append(t)
+    # print vec_words[:2]
+    # print vec_tags[:2]
     return vec_words, vec_tags
 
 def word_to_char_id_list(word, vocab_chars):
@@ -147,14 +149,19 @@ def convert_to_list_of_sentences(dataset):
 
     words = []
     tags = []
-    for docs in dataset:
-        for sent in docs:
-            l = []
+    dataset_words, dataset_tags = dataset
+    for index1 in range(len(dataset_words)):
+        docs_words = dataset_words[index1]
+        docs_tags = dataset_tags[index1]
+        for index2 in range(len(docs_words)):
+            sent_words = docs_words[index2]
+            sent_tags = docs_tags[index2]
+            w = []
             t = []
-            for s in sent:
-                l.append(s[0])
-                t.append(s[1])
-            words.append(l)
+            for index3 in range(len(sent_words)):
+                w.append(sent_words[index3])
+                t.append(sent_tags[index3])
+            words.append(w)
             tags.append(t)
     return words, tags
 
@@ -333,7 +340,121 @@ def pad_sequences(sentences, value1, value2, has_char=False):
 
     return padded_sentences, sentence_lengths, padded_words, word_lengths
 
+def pad_sequences_word_ids(sentences, padding_value, config):
 
+    lengths = [len(sent) for sent in sentences]
+    max_sentence_len = max(lengths)
+    padded_sentences = []
+    sentence_lengths = []
+
+    if config.use_chars:
+        word_id_index = 1
+    else:
+        word_id_index = 0
+
+    for sent in sentences:
+        word_ids = [word[word_id_index] for word in sent]
+        if len(sent) < max_sentence_len:
+            padding = [padding_value] * (max_sentence_len - len(sent))
+            new_sent = word_ids + padding
+            padded_sentences.append(new_sent)
+            sentence_lengths.append(len(sent))
+
+        else:
+            padded_sentences.append(word_ids)
+            sentence_lengths.append(len(sent))
+
+    return padded_sentences, sentence_lengths
+
+
+def pad_sequences_char_ids(sentences, padding_value, config):
+
+    """
+    Args:
+        sentences: list of list of list
+        padding_value: char value to pad (scalar) 
+
+    Returns:
+        padded_sentences: list of list of list
+                        (no. of sentences x max_sentence_len x max_word_length)
+        word_lengths: list of list
+                      (no. of sentences x max_sentence_len)                   
+    """
+
+
+    lengths = [len(sent) for sent in sentences]
+    max_sentence_len = max(lengths)
+
+    lengths = [len(w[0]) for sent in sentences for w in sent]
+    max_word_length = max(lengths)
+
+    padding_value_list = [padding_value] * max_word_length
+    
+    word_lengths = []
+    padded_sentences = []
+
+    for sent in sentences:
+        char_id_words_list = [word[0] for word in sent]
+        new_char_id_words_list = [] # Will contain list of list of char_ids (for all words in a sentence)
+        word_lengths_sent = []
+        if len(sent) < max_sentence_len:
+            for char_ids in char_id_words_list:
+                if len(char_ids) < max_word_length:
+                    char_padding = [padding_value] * (max_word_length - len(char_ids))
+                    new_char_ids = char_ids + char_padding
+                    new_char_id_words_list.append(new_char_ids)
+                    word_lengths_sent.append(len(char_ids))
+                else:
+                    new_char_id_words_list.append(char_ids)
+                    word_lengths_sent.append(len(char_ids))
+
+            new_char_id_words_list = new_char_id_words_list + [padding_value_list] * (max_sentence_len - len(sent))
+
+            word_lengths_sent = word_lengths_sent + [0] * (max_sentence_len - len(sent))
+
+            padded_sentences.append(new_char_id_words_list)
+            word_lengths.append(word_lengths_sent)
+
+        else:
+            for char_ids in char_id_words_list:
+                if len(char_ids) < max_word_length:
+                    char_padding = [padding_value] * (max_word_length - len(char_ids))
+                    new_char_ids = char_ids + char_padding
+                    new_char_id_words_list.append(new_char_ids)
+                    word_lengths_sent.append(len(char_ids))
+                else:
+                    new_char_id_words_list.append(char_ids)
+                    word_lengths_sent.append(len(char_ids))
+            padded_sentences.append(new_char_id_words_list)
+            word_lengths.append(word_lengths_sent)
+
+    return padded_sentences, word_lengths
+
+def pad_sequences_features(sentences, padding_value, config):
+
+    
+    if config.use_chars:
+        feat_index = 2
+    else:
+        feat_index = 1
+
+
+    number_of_features = len(sentences[0][0][feat_index])
+    lengths = [len(sent) for sent in sentences]
+    max_sentence_len = max(lengths)
+
+    padding_value_list = [padding_value] * number_of_features
+    padded_sentences = []
+    for sent in sentences:
+        feats = [word[feat_index] for word in sent]
+        new_feats = []
+
+        if len(feats) < max_sentence_len:
+            new_feats = feats + [padding_value_list] * (max_sentence_len - len(sent))
+            padded_sentences.append(new_feats)
+        else:
+            padded_sentences.append(feats)
+    return padded_sentences
 
 def get_chunk_type(tok, idx_to_tag):
     """
@@ -402,3 +523,87 @@ def get_chunks(seq, tags, config):
 def leaky_relu(x, alpha=0.2):
     return tf.maximum(x, alpha * x)
 
+def update_vocabulary(list_of_sentences, config):
+
+    
+    print "Size of vocabulary before adding words: " + str(len(config.vocabulary))
+
+    vocabulary = config.vocabulary
+    for sent in list_of_sentences:
+        for word in sent:
+            vocabulary.add(word[1])
+
+    config.vocabulary = vocabulary
+
+    print "Size of vocabulary after adding words: " + str(len(config.vocabulary))
+
+
+def generate_words_vocab(train_data, dev_data, test_data, config):
+
+    """Done so that system can be used on a GPU
+       Reduce size of embedding matrix to only 
+       those words in train, dev and test set
+    """
+    if not config.reduce_embeddings:
+        return
+
+
+    vocabulary = set()
+    
+    for st in config.special_tokens:
+        vocabulary.add(st)
+
+    list_of_sentences_train, _ = convert_to_list_of_sentences(train_data)
+    list_of_sentences_dev, _ = convert_to_list_of_sentences(dev_data)
+    list_of_sentences_test, _ = convert_to_list_of_sentences(test_data)
+
+    list_of_sentences = []
+    list_of_sentences.extend(list_of_sentences_train)
+    list_of_sentences.extend(list_of_sentences_dev)
+    list_of_sentences.extend(list_of_sentences_test)
+
+
+    for sent in list_of_sentences:
+        for word in sent:
+            vocabulary.add(word)
+            vocabulary.add(word.lower())
+
+    new_vocab_words = {}
+
+    
+    vocabulary_list = list(vocabulary)
+
+    for word in vocabulary_list:
+        if word not in config.vocab_words:
+            vocabulary.discard(word)
+
+    vocabulary_list = list(vocabulary)
+    
+    index = 0
+    for index in range(len(vocabulary_list)):
+        new_vocab_words[vocabulary_list[index]] = index
+        index +=1
+
+    print "Size of Dataset Vocabulary : " + str(len(new_vocab_words))
+
+
+    embeddings = config.embeddings_matrix
+
+    new_embeddings = np.zeros((len(new_vocab_words), config.word2vec_dim))
+
+    for key, index_to_insert in new_vocab_words.iteritems():
+        if key in config.vocab_words:
+            index_present = config.vocab_words[key]
+            new_embeddings[index_to_insert] = embeddings[index_present]
+
+    
+
+    config.embeddings_matrix = new_embeddings
+    config.vocab_words = new_vocab_words
+    config.update_size()
+    config.word2vec_size = len(new_vocab_words)
+    config.word_index_padding = new_vocab_words[config.NONE]
+    print new_embeddings.shape
+    print config.word2vec_size
+
+    print "Size of Final Vocab : " + str(config.nwords)
