@@ -8,6 +8,8 @@ public class SimpleToken {
 	private String text;
 	
 	private List<Integer> features;
+	
+	private String posTag;
 
 	
 	public SimpleToken(String text) {
@@ -36,7 +38,31 @@ public class SimpleToken {
 		this.features = features;
 	}
 	
+	public String getPosTag() {
+		return posTag;
+	}
+
+	public void setPosTag(String posTag) {
+		this.posTag = posTag;
+	}
+
 	public void addFeatureValue(Integer featureValue){
 		this.features.add(featureValue);
+	}
+	
+	public void addFeatureVector(List<Integer> featureVector){
+		if (featureVector.size() == 0) return;
+		
+		for(Integer fv: featureVector){
+			this.features.add(fv);
+		}
+	}
+	
+	public void addFeatureVector(int[] featureVector){
+		if (featureVector.length == 0) return;
+		
+		for(int fv: featureVector){
+			this.features.add(fv);
+		}
 	}
 }

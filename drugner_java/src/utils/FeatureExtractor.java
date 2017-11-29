@@ -64,7 +64,8 @@ public class FeatureExtractor {
 		// System.out.println(token.getText() + token.getFeatures());
 		// }
 		// }
-
+		
+		simpleSentences = DragonPosTagger.getPosTag(simpleSentences, path);
 		writeFeatureVectors(simpleSentences, output);
 
 	}
