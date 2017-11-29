@@ -82,6 +82,7 @@ class Config():
     filename_test = "data/task_test_conll.txt"
     #filename_train = "data/ddiDataInCONLL_train_2.txt"
     filename_train = "data/task_train_conll.txt"
+    shuffle_data = True
 
 
     # Char Embedding variables
@@ -148,6 +149,7 @@ class Config():
 
     print "Printing all parameter values ... "
 
+    print "shuffle_data\t" + str(shuffle_data) 
     print "use_chars\t" + str(use_chars) 
     print "dim_char\t" + str(dim_char) 
     print "hidden_size_char\t" + str(hidden_size_char) 

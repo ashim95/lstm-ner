@@ -2,6 +2,7 @@ import numpy as np
 import pickle
 import gensim
 from feature_extractor import extract_features
+from random import shuffle
 
 # Special Tokens
 UNK = "$UNK$"
@@ -126,6 +127,17 @@ def vectorize_text_data(data, vocab_words, vocab_chars, vocab_tags, config):
         vec_tags.append(t)
     # print vec_words[:2]
     # print vec_tags[:2]
+    if config.shuffle_data:
+        vec_words_shuffle = []
+        vec_tags_shuffle = []
+        idx = range(0, len(vec_words))
+        shuffle(idx)
+        for index in idx:
+            vec_words_shuffle.append(vec_words[index])
+            vec_tags_shuffle.append(vec_tags[index])
+        vec_words = []
+        vec_tags = []
+        return vec_words_shuffle, vec_tags_shuffle
     return vec_words, vec_tags
 
 def word_to_char_id_list(word, vocab_chars):
