@@ -113,7 +113,7 @@ public class DNormDiseaseTagger {
 		Properties properties = new Properties();
 
 		try {
-			properties.load(new FileInputStream(new File(PROPERTIES_FILE)));
+			properties.load(new FileInputStream(new File(pathCat + PROPERTIES_FILE)));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
