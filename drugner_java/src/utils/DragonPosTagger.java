@@ -13,7 +13,7 @@ public class DragonPosTagger {
 	private static Tagger posTagger;
 
 	public static List<SimpleSentence> getPosTag(List<SimpleSentence> sentences, String path) {
-
+		System.out.println("Using Dragon POS Tagger ...");
 		configure(path);
 
 		for (SimpleSentence sent : sentences) {
@@ -34,6 +34,7 @@ public class DragonPosTagger {
 				sent.getToken(index).addFeatureVector(fv);
 			}
 		}
+		System.out.println("Completed using Dragon POS Tagger ...");
 		return sentences;
 	}
 

@@ -22,9 +22,9 @@ public class FeatureExtractor {
 
 	public static void main(String[] args) throws Exception {
 
-		String input = args[0];
-		String output = args[1];
-		String path = args[2]; // For Relative path to drugner_java folder
+		 String input = args[0];
+		 String output = args[1];
+		 String path = args[2]; // For Relative path to drugner_java folder
 		String dictionaryFilename1 = null;
 		String dictionaryFilename2 = null;
 
@@ -34,11 +34,11 @@ public class FeatureExtractor {
 		if (args.length > 4) {
 			dictionaryFilename2 = args[4];
 		}
-		
-		
+
+//		String path = "";
 		// String dictionaryFilename = "../data/drug_names_wiki.txt";
-		// String input = "../logs/input/in.txt";
-		// String output = "../logs/output/out.txt";
+//		String input = "../logs/input/in.txt";
+//		String output = "../logs/output/out.txt";
 
 		List<SimpleSentence> simpleSentences = readData(input);
 
@@ -49,23 +49,24 @@ public class FeatureExtractor {
 			sentences = dictionaryTag(sentences, dictionaryFilename1);
 			simpleSentences = dictionaryTagstoFeatureVector(sentences, simpleSentences);
 		}
-		
+
 		if (dictionaryFilename2 != null) {
 			List<Sentence> sentences2 = convertSimpleSentencetoSentence(simpleSentences);
 			sentences2 = dictionaryTag(sentences2, dictionaryFilename2);
 			simpleSentences = dictionaryTagstoFeatureVector(sentences2, simpleSentences);
 		}
-		
+
 		simpleSentences = OpenNLPChunker.getChunks(simpleSentences, path);
 
-		// for(SimpleSentence sent: simpleSentences){
-		// System.out.println("\n");
-		// for(SimpleToken token : sent.getTokensList()){
-		// System.out.println(token.getText() + token.getFeatures());
-		// }
-		// }
-		
-		simpleSentences = DragonPosTagger.getPosTag(simpleSentences, path);
+		simpleSentences = DNormDiseaseTagger.getDiseaseTags(simpleSentences, path);
+		 simpleSentences = DragonPosTagger.getPosTag(simpleSentences, path);
+
+//		for (SimpleSentence sent : simpleSentences) {
+//			System.out.println("\n");
+//			for (SimpleToken token : sent.getTokensList()) {
+//				System.out.println(token.getText() + token.getFeatures());
+//			}
+//		}
 		writeFeatureVectors(simpleSentences, output);
 
 	}
