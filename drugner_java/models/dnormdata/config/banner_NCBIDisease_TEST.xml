@@ -14,9 +14,9 @@
       <outputFilename>output/output.txt</outputFilename>
       <inContextAnalysisFilename>output/contextAnalysis.html</inContextAnalysisFilename>
       <mentionFilename>output/mention.txt</mentionFilename>
-      <modelFilename>models/dnormdata/model/model_NCBIDisease_O1_TRAINDEV.bin</modelFilename>
-      <lemmatiserDataDirectory>nlpdata/lemmatiser</lemmatiserDataDirectory>
-      <posTaggerDataDirectory>nlpdata/tagger</posTaggerDataDirectory>
+      <modelFilename>drugner_java/models/dnormdata/model/model_NCBIDisease_O1_TRAINDEV.bin</modelFilename>
+      <lemmatiserDataDirectory>drugner_java/nlpdata/lemmatiser</lemmatiserDataDirectory>
+      <posTaggerDataDirectory>drugner_java/nlpdata/tagger</posTaggerDataDirectory>
       <posTagger>dragon.nlp.tool.HeppleTagger</posTagger>
       <tokenizer>banner.tokenization.SimpleTokenizer</tokenizer>
       <useParenthesisPostProcessing>true</useParenthesisPostProcessing>

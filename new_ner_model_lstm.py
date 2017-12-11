@@ -22,10 +22,8 @@ class NerModelLstm():
         self.sess   = None
         self.saver  = None
 
-        # Default Params
         self.hidden_size_lstm = self.config.hidden_size_lstm
-        self.lr = self.config.default_lr
-        self.batch_size = self.config.batch_size
+
 
     def add_placeholders(self):
         """Adds placeholder variables to tensorflow computational graph.
@@ -61,30 +59,44 @@ class NerModelLstm():
         # shape = (batch_size, max length of sentence in batch, number_of__handcrafted_features)
         self.input_feats = tf.placeholder(tf.float32, shape=[None, None, self.config.features_size], 
                             name="input_feats")
+        
+        # Dropout is given as placeholder so that we can switch it off during
+        # testing phase, the value of the variable is the keep_probability
+        # A scalar
+        self.dropout = tf.placeholder(dtype=tf.float32, shape=[], 
+                                      name="dropout")
 
-
+        # Learning rate is a placeholder because we want to be able to change it
+        # at every epoch (learning_rate decay)
+        # A scalar
+        self.learning_rate = tf.placeholder(dtype=tf.float32, shape=[],
+                                            name="learning_rate")
 
     def add_embeddings_op(self):
-        """Adds embedding ops to computational graph
+        
+        """   
+        Adds embedding ops to computational graph
+        Can add word_embeddings ops, char_embeddings ops and an op for other 'hand_crafted features'
+        Specify the same in config file
         """
-
 
         with tf.variable_scope("word_embed"):
 
-            _word_embeddings = tf.Variable(tf.constant(0.0, shape=[self.config.word2vec_size,
-                                                        self.config.word2vec_dim]),
-                                                        trainable=self.config.use_pretrained,
-                                                         name="_word_embeddings")
-
-            self.embedding_init = _word_embeddings.assign(self.embd_place)
-
-            word_embeddings = tf.nn.embedding_lookup(_word_embeddings,
-                    self.word_ids, name="word_embeddings")
-
-            # Following node was used for debugging purposes
-            # word_embeddings = tf.Print(word_embeddings, 
-            #                           [word_embeddings], summarize=100)
-
+            if self.config.use_word_embeddings:
+                _word_embeddings = tf.Variable(tf.constant(0.0, shape=[self.config.word2vec_size,
+                                                            self.config.word2vec_dim]),
+                                                            trainable=self.config.retrain_embeddings,
+                                                             name="_word_embeddings")
+    
+                self.embedding_init = _word_embeddings.assign(self.embd_place)
+    
+                word_embeddings = tf.nn.embedding_lookup(_word_embeddings,
+                        self.word_ids, name="word_embeddings")
+    
+                # Following node was used for debugging purposes
+                # word_embeddings = tf.Print(word_embeddings, 
+                #                           [word_embeddings], summarize=100)
+    
         
         with tf.variable_scope("char_embed"):
 
@@ -117,19 +129,23 @@ class NerModelLstm():
                 # shape = (batch size, max sentence length, char hidden size)
                 output = tf.reshape(output,
                         shape=[s[0], s[1], 2*self.config.hidden_size_char])
+                if self.config.use_word_embeddings:
+                    word_embeddings = tf.concat([word_embeddings, output], axis=-1)
+                else:
+                    word_embeddings = output
                 word_embeddings = tf.concat([word_embeddings, output], axis=-1)
 
         with tf.variable_scope("other_features"):
             # print word_embeddings.shape
             if self.config.use_hand_crafted:
-                word_embeddings = tf.concat([word_embeddings, self.input_feats], axis=-1)
+                if (not self.config.use_word_embeddings) and (not self.config.use_chars):
+                    word_embeddings = self.input_feats
+                else:
+                    word_embeddings = tf.concat([word_embeddings, self.input_feats], axis=-1)
             # print word_embeddings.shape
         # Add for discrete feature sets
 
-        # if self.config.use_dropout:
-        #     self.word_embeddings =  tf.nn.dropout(word_embeddings, self.config.dropout_rate)
-        # else:
-        self.word_embeddings = word_embeddings
+        self.word_embeddings =  tf.nn.dropout(word_embeddings, self.dropout)
 
     def add_predictions_op(self):
         """ Takes input and transforms into predictions
@@ -146,8 +162,7 @@ class NerModelLstm():
 
                 output = tf.concat([output_fw, output_bw], axis=-1)
                 
-                if self.config.use_dropout:
-                    output = tf.nn.dropout(output, self.config.dropout_rate)
+                output = tf.nn.dropout(output, self.dropout)
 
         else:
             with tf.variable_scope("lstm"):
@@ -156,8 +171,7 @@ class NerModelLstm():
                 output, _ = tf.nn.dynamic_rnn(cell, self.word_embeddings, 
                                             sequence_length = self.sequence_lengths,
                                             dtype=tf.float32)
-                if self.config.use_dropout:
-                    output = tf.nn.dropout(output, self.config.dropout_rate)
+                output = tf.nn.dropout(output, self.dropout)
 
 
         with tf.variable_scope("pred_scores"):
@@ -195,6 +209,7 @@ class NerModelLstm():
 
         # If use Linear Chain CRF
         if self.config.use_crf:
+
             log_likelihood, trans_params = tf.contrib.crf.crf_log_likelihood(
                 self.logits, self.labels, self.sequence_lengths)
 
@@ -211,6 +226,7 @@ class NerModelLstm():
                 logits=self.logits, labels=self.labels)
 
             if self.config.use_class_weights:
+
                 ratio_0 = self.config.class_0_weight
                 class_weight = tf.constant([ratio_0, (1.0 - ratio_0)/2, (1.0 - ratio_0)/2])
 
@@ -228,24 +244,26 @@ class NerModelLstm():
 
 
 
-    def add_training_op(self):
-        """Adds training ops to the computational graph
+    def add_training_op(self, l_rate):
+        """
+        Adds training ops to the computational graph
+        l_rate : is a placeholder 
         """
 
-        _lr_m = self.config.learning_method.lower()
+        lr_method = self.config.learning_method.lower().strip()
         clip = self.config.clip
         with tf.variable_scope("train_op"):
 
-            if _lr_m == 'adam':
-                optimizer = tf.train.AdamOptimizer(self.lr)
-            elif _lr_m == 'adagrad':
-                optimizer = tf.train.AdagradOptimizer(self.lr)
-            elif _lr_m == 'sgd':
-                optimizer = tf.train.GradientDescentOptimizer(self.lr)
-            elif _lr_m == 'rmsprop':
-                optimizer = tf.train.RMSPropOptimizer(self.lr)
+            if lr_method == 'adam':
+                optimizer = tf.train.AdamOptimizer(l_rate)
+            elif lr_method == 'adagrad':
+                optimizer = tf.train.AdagradOptimizer(l_rate)
+            elif lr_method == 'sgd':
+                optimizer = tf.train.GradientDescentOptimizer(l_rate)
+            elif lr_method == 'rmsprop':
+                optimizer = tf.train.RMSPropOptimizer(l_rate)
             else:
-                raise NotImplementedError("Unknown method {}".format(_lr_m))
+                raise NotImplementedError("Unknown method {}".format(lr_method))
 
             if  clip > 0: # gradient clipping if clip is positive
                 grads, vs     = zip(*optimizer.compute_gradients(self.loss))
@@ -255,25 +273,8 @@ class NerModelLstm():
             else:
                 self.train_op = optimizer.minimize(self.loss)
 
-    def create_feed_dict(self, sentences, labels=None):
+    def create_feed_dict(self, sentences, labels=None, keep_probability=None, lr=None):
 
-        # if self.config.use_chars:
-            
-        #     word_ids, sequence_lengths, char_ids, word_lengths = pad_sequences(sentences, 
-        #                                                             self.config.word_index_padding, 
-        #                                                             self.config.char_index_padding, 
-        #                                                             has_char = True)
-
-        # else:
-        #     word_ids, sequence_lengths, _, _ = pad_sequences(sentences, 
-        #                                                             self.config.word_index_padding, 
-        #                                                             self.config.char_index_padding, 
-        #                                                             )
-        # print len(word_ids)
-
-        # print word_ids[:2]
-        # print sequence_lengths[:2]
-        # Create feed dictionary
         word_ids, sequence_lengths = pad_sequences_word_ids(sentences, self.config.word_index_padding, self.config)
 
         if self.config.use_chars:
@@ -282,18 +283,13 @@ class NerModelLstm():
 
         if self.config.use_hand_crafted:
             input_feats = pad_sequences_features(sentences, self.config.features_padding, self.config)
-            # print input_feats[0][0]
-            # print type(input_feats[0][0])
-            # l = [len(i) for i in input_feats]
-            # #print l
-            # pprint.pprint(input_feats[:10])
 
         # print word_ids
-        feed = {
-            self.word_ids: word_ids,
-            self.sequence_lengths: sequence_lengths
-        }
-
+        feed = {}
+        feed[self.sequence_lengths] = sequence_lengths
+        if self.config.use_word_embeddings:
+            feed[self.word_ids] = word_ids
+    
         if labels is not None:
 
             labels, _, _, _ = pad_sequences(labels,
@@ -312,14 +308,24 @@ class NerModelLstm():
             # print arr.shape
             feed[self.input_feats] = arr
 
+
+        if lr is not None:
+            
+            # Case when running evaluation or inference on the graph
+            # for training phase only
+
+            feed[self.learning_rate] = lr
+
+        feed[self.dropout] = keep_probability
+
         return feed
 
 
     def save_session(self):
         """Saves session = weights"""
-        if not os.path.exists(self.config.model_dir):
-            os.makedirs(self.config.model_dir)
-        self.saver.save(self.sess, self.config.model_dir)
+        if not os.path.exists(self.config.dir_model):
+            os.makedirs(self.config.dir_model)
+        self.saver.save(self.sess, self.config.dir_model)
 
     def build_model(self):
 
@@ -327,7 +333,7 @@ class NerModelLstm():
         self.add_embeddings_op()
         self.add_predictions_op()
         self.add_loss_op()
-        self.add_training_op()
+        self.add_training_op(self.learning_rate)
 
     def restore(self, model_path):
         
@@ -355,7 +361,6 @@ class NerModelLstm():
                 tf.reset_default_graph()
 
                 self.hidden_size_lstm = h_size_lstm
-                self.lr = lr
 
                 self.build_model()
 
@@ -365,8 +370,8 @@ class NerModelLstm():
 
                 self.sess.run(init)
                 self.saver = tf.train.Saver()
-                self.sess.run([self.embedding_init], {self.embd_place:self.config.embeddings_matrix})
-
+                if self.config.use_word_embeddings:
+                    self.sess.run([self.embedding_init], {self.embd_place:self.config.embeddings_matrix})
 
                 best_score = 0
                 nepoch_no_imprv = 0 # for early stopping
@@ -376,16 +381,17 @@ class NerModelLstm():
                     self.logger.info("Epoch {:} out of {:}".format(epoch + 1,
                         self.config.nepochs))
 
-                    score = self.run_epoch(train_set, dev_set, epoch)
+                    score = self.run_epoch(train_set, dev_set, epoch, lr)
 
-                    self.lr *= self.config.lr_decay # decay learning rate
+                    lr *= self.config.lr_decay # decay learning rate
 
                     # early stopping and saving best parameters
                     if score >= best_score:
                         nepoch_no_imprv = 0
                         self.save_session()
                         best_score = score
-                        self.logger.info("- new best score!")
+                        print "Best score achieved !! " + str(score)
+                        self.logger.info("Best score achieved !! " + str(score))
                     else:
                         nepoch_no_imprv += 1
                         if nepoch_no_imprv >= self.config.nepoch_no_imprv:
@@ -394,7 +400,10 @@ class NerModelLstm():
                             break
 
 
-                print "Evaluating the best model on Test Set"
+                print "Evaluating the best model on Test Set ... "
+
+                self.evaluate(test_set)
+
 
                 test_set_performance = self.evaluate(test_set, is_test_set=True)
                 self.config.precision = test_set_performance["Precision"]
@@ -406,7 +415,7 @@ class NerModelLstm():
 
                 save_parameters_to_file(self.config)
 
-    def run_epoch(self, train_set, dev_set, epoch):
+    def run_epoch(self, train_set, dev_set, epoch, lr_for_epoch):
         """Performs one epoch on whole trainning set
         Args:
             train_set: tuple of words, tags for training
@@ -419,9 +428,9 @@ class NerModelLstm():
         prog = Progbar(target=nbatches)
         x_train = train_set[0]
         y_train = train_set[1]
-        for i, (sentences_batch, labels_batch) in enumerate(get_next_batch(  (x_train, y_train), self.batch_size)):
+        for i, (sentences_batch, labels_batch) in enumerate(get_next_batch((x_train, y_train), self.config.batch_size)):
 
-            feed_batch = self.create_feed_dict(sentences_batch, labels_batch)
+            feed_batch = self.create_feed_dict(sentences_batch, labels_batch, keep_probability=self.config.dropout_rate, lr=lr_for_epoch)
             # print feed_batch
 
             _, train_loss = self.sess.run([self.train_op, self.loss], feed_dict=feed_batch)
@@ -440,7 +449,8 @@ class NerModelLstm():
 
     def predict_batch(self,sentences):
 
-        feed_batch = self.create_feed_dict(sentences)
+        # Use keep probability equal to 1.0 since we are in testing phase
+        feed_batch = self.create_feed_dict(sentences, keep_probability=1.0)
 
         sequence_lengths_batch = feed_batch[self.sequence_lengths]
 
@@ -478,7 +488,7 @@ class NerModelLstm():
 
         correct_preds, total_correct, total_preds = 0., 0., 0.
 
-        for sentences_batch, labels_batch in get_next_batch((x_test, y_test), self.batch_size):
+        for sentences_batch, labels_batch in get_next_batch((x_test, y_test), self.config.batch_size):
 
             labels_pred_batch, sequence_lengths_batch = self.predict_batch(sentences_batch)
 

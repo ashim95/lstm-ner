@@ -1,10 +1,12 @@
 from utils import load_dataset, vectorize_text_data, get_next_batch, generate_words_vocab
-from ner_model_lstm import NerModelLstm
+from new_ner_model_lstm import NerModelLstm
 from config import Config
 
-def main():
+def main(run_number):
 
-    config = Config(only_config=False)
+    print "Running the Code for run number : " + str(run_number)
+
+    config = Config(phase="train")
 
     # Load data from txt files
     train_data = load_dataset(config.filename_train)
@@ -46,6 +48,43 @@ def main():
 
     # model.evaluate(test_vectorize)
     
+    print "\n\nCompleted running the code for run number : " + str(run_number) +  " with following performance stats : "
+
+    print "Precision : " + str(config.precision)
+    print "Recall    : " + str(config.recall)
+    print "F1 Score  : " + str(config.f1)
+    print "\n\n"
+    return config.precision, config.recall, config.f1, config.dir_model
 
 if __name__ == "__main__":
-    main()
+    
+    total_runs = 3
+    precision = []
+    recall = []
+    f1 = []
+    model_dirs = []
+    for run_number in range(1,total_runs + 1):
+        p, r, f, model = main(run_number)
+        precision.append(p)
+        recall.append(r)
+        f1.append(f)
+        model_dirs.append(model)
+
+        print "Average After Run Number : " + str(run_number)
+        print "Average Precision        : " + str(precision/run_number)
+        print "Average Recall           : " + str(recall/run_number)
+        print "Average F1 Score         : " + str(f1/run_number)
+        
+        print "Model Directories : "
+        print model_dirs
+    
+    print "Completed all runs !!" 
+    print "Precision List : "
+    print precision
+    print "\nRecall List : "
+    print recall
+    print "\nF1 List : "
+    print f1
+    print "\nModel Directories : "
+    print model_dirs
+

@@ -57,9 +57,8 @@ public class FeatureExtractor {
 		}
 
 		simpleSentences = OpenNLPChunker.getChunks(simpleSentences, path);
-
 		simpleSentences = DNormDiseaseTagger.getDiseaseTags(simpleSentences, path);
-		 simpleSentences = DragonPosTagger.getPosTag(simpleSentences, path);
+		simpleSentences = DragonPosTagger.getPosTag(simpleSentences, path);
 
 //		for (SimpleSentence sent : simpleSentences) {
 //			System.out.println("\n");

@@ -1,28 +1,52 @@
 from basic_utils import get_logger
 import os
 from utils import import_vocab_dicts, load_word_embeddings
-
+import datetime
 
 class Config():
-    def __init__(self, only_config=True):
+    def __init__(self, phase="none"):
 
+        if phase == "none":
+            
+            # Only using Configuration variables and vocabs
 
-        # directory for training outputs
-        if not os.path.exists(self.dir_output):
-            os.makedirs(self.dir_output)
+            self.load_vocab()
 
-        # create instance of logger
-        self.logger = get_logger(self.path_log)
-        self.load_vocab()
-
-        if not only_config:
-
+        if phase == "train":
+            
+            self.dir_model = self.dir_model + str(datetime.datetime.now().strftime("%d-%m-%Y_%H-%M")) + "/"
+            
+            # For trainng phase
+            # directory for training outputs
+            if not os.path.exists(self.dir_model):
+                os.makedirs(self.dir_model)
+    
+            # Pickle file inside dir_model to save hyperparameters and test performance stats
+            self.hparmas_file = self.dir_model + self.hparmas_file
+    
+            self.wrong_predictions_file = self.dir_model + self.wrong_predictions_file
+    
+            # Directory inside dir_model to save tf model
+            self.model_dir = self.dir_model + "model/"
+    
+    
+            # create instance of logger
+            self.logger = get_logger(self.dir_model + self.log_file)
+            self.load_vocab()
             self.load_embeddings()
 
             self.load_dictionary()
 
-    
+        if phase == "restore":
+
+            # Restoring the model
+            self.logger = None
+            self.load_vocab()
+
     def load_dictionary(self):
+        if not self.use_hand_crafted:
+            self.gazetteer = set()
+            return
         names = []
         with open(self.dictionary_names_file, 'rb') as fp:
             for line in fp:
@@ -55,10 +79,16 @@ class Config():
 
     special_tokens = [UNK, NUM, NONE]
 
-    dir_output = "results/test/"
-    dir_model  = dir_output + "model.weights/"
-    path_log   = dir_output + "log.txt"
+    root_dir = "models/"
+    dir_model  = root_dir + "model_"
+    log_file   = "log.txt"
+    hparmas_file = "logged_hparams.pkl"
+    wrong_predictions_file = "wrong_predictions.txt"
 
+    # space separated variables name of complex data structures like (list, dict, set, tuple) to log 
+    # All other simple variables are logged by default
+    special_variables_to_log = "hidden_size_lstm_list learning_rates_list features_index special_tokens"
+    primitive_type_variables_to_log = (str, int, bool, float, long)
 
 
     # vocab (dictionaries saved as pkl files)
@@ -71,9 +101,9 @@ class Config():
     filename_word2vec = "data/wikipedia-pubmed-and-PMC-w2v.bin"
     word2vec_size = 5443659
     word2vec_dim = 200
-    use_pretrained = False
+    retrain_embeddings = False
     reduce_embeddings = True
-
+    use_word_embeddings = True
 
 
     # dataset
@@ -86,9 +116,9 @@ class Config():
 
 
     # Char Embedding variables
-    use_chars = False
-    dim_char = 100
-    hidden_size_char = 100
+    use_chars = True
+    dim_char = 50
+    hidden_size_char = 50
 
     # Dropout
     use_dropout = True
@@ -102,7 +132,7 @@ class Config():
     hidden_size_lstm_list = [300]
 
 
-    use_crf = False
+    use_crf = True
 
     # Class Weights for highly imbalanced datasets
     use_class_weights = False
@@ -114,10 +144,10 @@ class Config():
     learning_rates_list = [0.001]
     learning_method = "adam"
     clip = -1
-    nepochs = 70
-    batch_size = 256
-    lr_decay = 1
-    nepoch_no_imprv = 10
+    nepochs = 150
+    batch_size = 64
+    lr_decay = 0.9
+    nepoch_no_imprv = 30
 
 
 
@@ -131,12 +161,13 @@ class Config():
     char_index_padding = n_chars -1 
 
     # For Hand Crafted and Dictionary
-    use_hand_crafted = False
+    use_hand_crafted = True
     features_size = 2
     features_padding = 0.0
     use_dictionary = True
     dictionary_names_file = "data/drug_names_wiki.txt"
-    features_index = [0 , 1]
+    #features_index = [0]
+    features_index = [0 , 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     features_size = len(features_index)
 
     # Path Variables For Java Program
@@ -144,7 +175,7 @@ class Config():
     java_output_path = "logs/output/out.txt"
     java_dictionary_file_1 = "data/drug_names_wiki.txt"
     java_dictionary_file_2 = "data/drug_names_long.txt" 
-    java_jar_file = "drugner_java/jars/drugner_java_1.0.jar"
+    java_jar_file = "drugner_java/jars/drugner_java_1.2.jar"
 
 
     print "Printing all parameter values ... "

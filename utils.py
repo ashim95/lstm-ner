@@ -57,6 +57,10 @@ def load_pkl_file(filename):
         pkl_file = pickle.load(fp)
     return pkl_file
 
+def save_pkl_file(data, filename):
+    with open(filename, 'wb') as fp:
+        pickle.dump(data, fp, pickle.HIGHEST_PROTOCOL)
+    return
 
 def import_vocab_dicts(config):
 
@@ -619,3 +623,88 @@ def generate_words_vocab(train_data, dev_data, test_data, config):
     print config.word2vec_size
 
     print "Size of Final Vocab : " + str(config.nwords)
+
+def save_parameters_to_file(config):
+
+    variables_list = dir(config)
+    primitive_types = config.primitive_type_variables_to_log
+
+    variables_dict = {}
+    #For Complex variables
+    special_variables_to_log = config.special_variables_to_log.split(" ")
+
+    for var_name in variables_list:
+        if not callable(getattr(config, var_name)) and not var_name.startswith("__"):
+            if var_name in special_variables_to_log or (getattr(config, var_name).__class__ in primitive_types):
+
+                variables_dict[var_name] = getattr(config, var_name)
+
+    save_pkl_file(variables_dict, config.hparmas_file)
+
+
+def write_wrong_predictions_to_file(wrong_predictions, config):
+    
+    if config.use_chars:
+        word_id_index = 1
+    else:
+        word_id_index = 0
+
+    idx_to_word = {}
+
+    idx_to_tag = {idx: tag for tag, idx in config.vocab_tags.items()}
+    if len(wrong_predictions) == 0:
+        return
+
+    f = open(config.wrong_predictions_file, 'wb')
+    
+    print "Writing wrongly predicted sentences to file " + str(config.wrong_predictions_file)
+
+    for key, val in config.vocab_words.iteritems():
+        idx_to_word[val] = key
+
+    for wp in wrong_predictions:
+        sentence, fp_set, fn_set, lab, lab_pred = wp
+        word_ids = [word[word_id_index] for word in sentence]
+        words = [idx_to_word[w_id] for w_id in word_ids]
+        sentence_text = " ".join(words)
+
+        f.write(sentence_text + "\n")
+        for fp in fp_set:
+            line  = ""
+            start, end = fp[1], fp[2]
+            for i in range(end-start):
+                line += words[start + i] + " "
+
+            line += "\t"
+
+            for i in range(end-start):
+                line += str(idx_to_tag[lab_pred[start + i]]) + " "
+
+            line += "\t"
+            for i in range(end-start):
+                line += str(idx_to_tag[lab[start + i]]) + " "
+
+            f.write(line + "\n")
+
+        for fn in fn_set:
+            line  = ""
+            start, end = fn[1], fn[2]
+            for i in range(end-start):
+                line += words[start + i] + " "
+
+            line += "\t"
+
+            for i in range(end-start):
+                line += str(idx_to_tag[lab_pred[start + i]]) + " "
+
+            line += "\t"
+            for i in range(end-start):
+                line += str(idx_to_tag[lab[start + i]]) + " "
+
+            f.write(line + "\n")
+
+        f.write("\n\n")
+
+    print "Finished writing wrongly predicted sentences to file " + str(config.wrong_predictions_file) 
+    f.close()
+    return
